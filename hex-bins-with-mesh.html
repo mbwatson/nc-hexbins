@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>nc cities</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
+    <script src="https://d3js.org/d3-scale.v3.min.js"></script>
+    <script src="https://cdn.rawgit.com/eligrey/FileSaver.js/e9d941381475b5df8b7d7691013401e171014e89/FileSaver.min.js"></script>
+    <script src="./js/svg-save.js"></script>
+    <style>
+        body {
+            margin: 0;
+            text-align: center;
+        }
+        #svg-container {
+            padding: 1rem;
+        }
+        svg {
+            width: 100%;
+            height: 50vw;
+            max-height: 500px;
+        }
+        .state {
+            fill: azure;
+            stroke: cornflowerblue;
+            stroke-width: 1;
+        }
+        .hexbin {
+            transition: opacity 250ms;
+        }
+        .point {
+            fill: coral;
+            transition: opacity 250ms;
+        }
+        .hexmesh {
+            fill: none;
+            stroke: steelblue;
+            stroke-width: 1;
+        }
+        #actions {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            width: 90%;
+            max-width: 1080px;
+            margin: auto;
+
+        }
+        button {
+            background-color: white;
+            color: coral;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid coral;
+            cursor: pointer;
+        }
+        button.active {
+            background-color: coral;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="svg-container"></div>
+    <div id="actions">
+        <div class="toggles">
+            <button id="points-button" class="button active">Points</button>
+            <button id="hexbins-button" class="button active">Bins</button>
+            <button id="hexmesh-button" class="button active">Mesh</button>
+        </div>
+        <div class="export">
+            <button id="export-button">Export as PNG</button>
+        </div>
+    </div>
+    <script>
+        
+        // interactivity stuff
+        
+        let pointsVisible = true
+        let hexbinsVisible = true
+        let hexmeshVisible = true
+
+        const togglers = document.querySelectorAll('.button')
+        
+        togglers.forEach(button => {
+            button.addEventListener('click', function handleClickToggle(event) {
+                this.classList.toggle('active')
+                if (this.id === 'points-button') {
+                    pointsVisible = !pointsVisible
+                    document.querySelectorAll('.point').forEach(el => {
+                        el.style.opacity = pointsVisible ? 1 : 0
+                    })
+                }
+                if (this.id === 'hexbins-button') {
+                    hexbinsVisible = !hexbinsVisible
+                    document.querySelectorAll('.hexbin').forEach(el => {
+                        el.style.opacity = hexbinsVisible ? 1 : 0
+                    })
+                }
+                if (this.id === 'hexmesh-button') {
+                    hexmeshVisible = !hexmeshVisible
+                    document.querySelector('.hexmesh').style.opacity = hexmeshVisible ? 1 : 0
+                }
+                console.log({ pointsVisible, hexbinsVisible, hesmeshVisible })
+            })
+        })
+
+        d3.select('#export-button').on('click', () => {
+            const svgString = getSVGString(svg.node())
+            svgString2Image( svgString, 2*WIDTH, 2*HEIGHT, 'png', save ) // passes Blob and filesize String to the callback
+
+            function save( dataBlob, filesize ){
+                saveAs( dataBlob, 'D3 vis exported to PNG.png' ) // FileSaver.js function
+            }
+        })
+
+        // viz stuff
+
+        const STATEFILE = './data/nc.json'
+        const CITIESFILE = './data/cities.json'
+        const MARGIN = 16
+
+        const WIDTH = 1200
+        const HEIGHT = 600
+
+        const randomPoints = (feature, count = 100) => {
+            const points = []
+            const [[ minX, minY ], [ maxX, maxY ]] = d3.geoBounds(feature)
+            while (points.length < count) {
+                const x = minX + Math.random() * (maxX - minX)
+                const y = minY + Math.random() * (maxY - minY)
+                if (d3.geoContains(feature, [x, y])) {
+                    points.push([x, y])
+                }
+            }
+            return points
+        }
+        
+        let projection = d3.geoMercator()
+        let geoPath
+
+        const svg = d3.select('#svg-container')
+            .append('svg')
+            .attr("viewBox", [0, 0, WIDTH, HEIGHT])
+            .attr('width', WIDTH - 2 * MARGIN)
+            .attr('height', HEIGHT - 2 * MARGIN)
+            .attr("preserveAspectRatio", "xMidYMid meet")
+        
+        const clipPath = svg.append('clipPath').attr('id', 'clip')
+        const stateGroup = svg.append('g').attr('class', 'states')
+        const pointsGroup = svg.append('g').attr('class', 'points').attr("clip-path", "url(#clip)")
+        const hexbinsGroup = svg.append('g').attr('class', 'hexbins').attr("clip-path", "url(#clip)")
+        
+        // read data files, then...
+        Promise.all([
+            d3.json(STATEFILE),
+            d3.json(CITIESFILE),
+        ]).then(([state, cities]) => {
+            projection.fitSize([WIDTH, HEIGHT], state) // choose & modify a projection
+            geoPath = d3.geoPath().projection(projection) // create path generator initialized with the defined projection
+            
+            // state
+
+            stateGroup.selectAll('path')
+                .data(state.features).enter()
+                .append('path').attr('class', 'state')
+                .attr('d', d => geoPath(d))
+
+            clipPath.selectAll('path')
+                .data(state.features).enter()
+                .append('path').attr('class', 'state')
+                .attr('d', d => geoPath(d))
+
+            // points
+
+            const pointData = randomPoints(state, 2000)
+            // const pointData = cities.features.map(feature => feature.geometry.coordinates)
+
+            pointsGroup.selectAll('.point')
+                .data(pointData.map(f => f)).enter()
+                .append('circle').attr('class', 'point')
+                .attr('cx', d => projection(d)[0])
+                .attr('cy', d => projection(d)[1])
+                .attr('r', 2)
+
+            // hexbins
+
+            const hexbin = d3.hexbin()
+                .x(d => projection(d)[0])
+                .y(d => projection(d)[1])
+                .radius(20)
+                .size([WIDTH, HEIGHT])
+                .extent([[MARGIN, MARGIN], [WIDTH - MARGIN, HEIGHT - MARGIN]])
+            
+            // hexbins - mesh
+            
+            const mesh = hexbin.mesh()
+            console.log(mesh)
+            
+            hexbinsGroup.append('path')
+                .attr('class', 'hexmesh')
+                .attr('d', mesh)
+
+            // hexbins - bins
+
+            const bins = hexbin(pointData)
+            // console.log(bins)
+            // console.log([0, d3.max(bins, d => d.length)])
+            // for (let i = 0; i < d3.max(bins, d => d.length); i += 1) {
+            //     console.log(i, d3.scaleLinear().domain([0, d3.max(bins, d => d.length)]).range(['cyan', 'red'])(i))
+            // }
+
+            var radius = d3.scaleSqrt([0, d3.max(bins, d => d.length)], [0, 20])
+
+            hexbinsGroup.selectAll('.hexbin')
+                .data(bins)
+                .enter().append('path').attr('class', 'hexbin')
+                .attr('fill', d => d3.scaleLinear().domain([0, d3.max(bins, b => b.x * b.y)]).range(['cornflowerblue', 'darkorange'])(d.x * d.y))
+                .attr("d", d => `M ${ d.x },${ d.y } ${ hexbin.hexagon(radius(d.length)) }`)
+        })
+    </script>
+</body>
+</html>

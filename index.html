@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>nc cities</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        svg {
+            border: 1px solid #ccc;
+            padding: 1rem;
+        }
+        .state {
+            fill: darkcyan;
+            stroke: black;
+            stroke-width: 1;
+        }
+        .point {
+            /*fill: coral;*/
+            stroke: black;
+            stroke-width: 1;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        const STATEFILE = './data/nc.json'
+        const CITIESFILE = './data/cities.json'
+        const MARGIN = 16
+
+        const WIDTH = 960
+        const HEIGHT = 500
+        
+        let projection = d3.geoMercator()
+        let geoPath
+
+        const svg = d3.select('body')
+            .append('svg')
+            .attr("viewBox", [0, 0, WIDTH, HEIGHT])
+            .attr('width', WIDTH)
+            .attr('height', HEIGHT)
+
+        const stateGroup = svg.append('g').attr('class', 'states')
+        const pointsGroup = svg.append('g').attr('class', 'points')
+
+        Promise.all([
+            d3.json(STATEFILE),
+            d3.json(CITIESFILE),
+        ]).then(([state, cities]) => {
+            projection.fitSize([WIDTH, HEIGHT], state) // choose & modify a projection
+            geoPath = d3.geoPath().projection(projection) // create path generator initialized with the defined projection
+            stateGroup.selectAll('path')
+                .data(state.features).enter()
+                .append('path').attr('class', 'state')
+                .attr('d', geoPath)
+
+            const maxPopulation = Math.max(...cities.features.map(city => city.properties.population))
+            const pointSize = d => `${ d.properties.population / maxPopulation * 15 + 5 }px`
+            const pointColor = d => `fill: hsl(${ Math.floor((d.properties.population / maxPopulation) * 36 + 170) }, 100%, 50%)`
+
+            pointsGroup.selectAll('.point')
+                .data(cities.features.map(f => f)).enter()
+                .append('circle').attr('class', 'point')
+                .attr('cx', d => projection(d.geometry.coordinates)[0])
+                .attr('cy', d => projection(d.geometry.coordinates)[1])
+                .attr('r', d => pointSize(d))
+                .attr('style', d => pointColor(d))
+            })
+    </script>
+</body>
+</html>
