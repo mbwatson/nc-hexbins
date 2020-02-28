@@ -102,7 +102,6 @@
                     hexmeshVisible = !hexmeshVisible
                     document.querySelector('.hexmesh').style.opacity = hexmeshVisible ? 1 : 0
                 }
-                console.log({ pointsVisible, hexbinsVisible, hesmeshVisible })
             })
         })
 
@@ -160,7 +159,7 @@
             projection.fitSize([WIDTH, HEIGHT], state) // choose & modify a projection
             geoPath = d3.geoPath().projection(projection) // create path generator initialized with the defined projection
             
-            // state
+            // STATE
 
             stateGroup.selectAll('path')
                 .data(state.features).enter()
@@ -172,7 +171,7 @@
                 .append('path').attr('class', 'state')
                 .attr('d', d => geoPath(d))
 
-            // points
+            // POINTS
 
             const pointData = randomPoints(state, 2000)
             // const pointData = cities.features.map(feature => feature.geometry.coordinates)
@@ -184,7 +183,9 @@
                 .attr('cy', d => projection(d)[1])
                 .attr('r', 2)
 
-            // hexbins
+            // HEXBINS
+
+            // hexbin generator
 
             const hexbin = d3.hexbin()
                 .x(d => projection(d)[0])
@@ -195,24 +196,14 @@
             
             // hexbins - mesh
             
-            const mesh = hexbin.mesh()
-            console.log(mesh)
-            
             hexbinsGroup.append('path')
                 .attr('class', 'hexmesh')
-                .attr('d', mesh)
+                .attr('d', hexbin.mesh())
 
             // hexbins - bins
 
             const bins = hexbin(pointData)
-            // console.log(bins)
-            // console.log([0, d3.max(bins, d => d.length)])
-            // for (let i = 0; i < d3.max(bins, d => d.length); i += 1) {
-            //     console.log(i, d3.scaleLinear().domain([0, d3.max(bins, d => d.length)]).range(['cyan', 'red'])(i))
-            // }
-
             var radius = d3.scaleSqrt([0, d3.max(bins, d => d.length)], [0, 20])
-
             hexbinsGroup.selectAll('.hexbin')
                 .data(bins)
                 .enter().append('path').attr('class', 'hexbin')
