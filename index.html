@@ -117,7 +117,6 @@
         // viz stuff
 
         const STATEFILE = './data/nc.json'
-        const CITIESFILE = './data/cities.json'
         const MARGIN = 16
 
         const WIDTH = 1200
@@ -152,10 +151,7 @@
         const hexbinsGroup = svg.append('g').attr('class', 'hexbins').attr("clip-path", "url(#clip)")
         
         // read data files, then...
-        Promise.all([
-            d3.json(STATEFILE),
-            d3.json(CITIESFILE),
-        ]).then(([state, cities]) => {
+        d3.json(STATEFILE).then(state => {
             projection.fitSize([WIDTH, HEIGHT], state) // choose & modify a projection
             geoPath = d3.geoPath().projection(projection) // create path generator initialized with the defined projection
             
